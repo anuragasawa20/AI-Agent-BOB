@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 
-# Create persistent directory for embeddings
+# Path to pre-computed embeddings (stored in the repo)
+PRECOMPUTED_EMBEDDINGS = "./bob_ai/whisky_embeddings"
+
+# Where embeddings will be used in the app
 PERSIST_DIR = os.environ.get("PERSIST_DIR", "./whisky_embeddings")
 DATA_PATH = os.environ.get("DATA_PATH", "./501 Bottle Dataset.csv")
 PORT = int(os.environ.get("PORT", 5001))
@@ -30,13 +33,46 @@ if not api_key:
 # Function to initialize the recommendation system
 def initialize_system():
     logger.info(
-        f"Initializing WhiskyRecommendationSystem with persist_directory={PERSIST_DIR}"
+        f"Setting up WhiskyRecommendationSystem with persist_directory={PERSIST_DIR}"
     )
     try:
         # Create directory if it doesn't exist
         Path(PERSIST_DIR).mkdir(parents=True, exist_ok=True)
 
-        # Initialize the system
+        # Check if embeddings directory is empty
+        if not os.path.exists(os.path.join(PERSIST_DIR, "chroma.sqlite3")):
+            # Copy pre-computed embeddings if available
+            if os.path.exists(PRECOMPUTED_EMBEDDINGS):
+                logger.info(
+                    f"Copying pre-computed embeddings from {PRECOMPUTED_EMBEDDINGS}"
+                )
+
+                # List files in precomputed directory to verify
+                embedding_files = os.listdir(PRECOMPUTED_EMBEDDINGS)
+                logger.info(f"Found embedding files: {embedding_files}")
+
+                # Copy all files from precomputed dir to persist dir
+                for item in embedding_files:
+                    source = os.path.join(PRECOMPUTED_EMBEDDINGS, item)
+                    dest = os.path.join(PERSIST_DIR, item)
+
+                    if os.path.isdir(source):
+                        shutil.copytree(source, dest, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(source, dest)
+
+                logger.info(f"Successfully copied embeddings to {PERSIST_DIR}")
+            else:
+                logger.warning(
+                    f"No pre-computed embeddings found at {PRECOMPUTED_EMBEDDINGS}"
+                )
+                logger.warning(
+                    "Embeddings will be generated on first use (may be slow)"
+                )
+        else:
+            logger.info(f"Using existing embeddings in {PERSIST_DIR}")
+
+        # Initialize the system with existing or copied embeddings
         system = WhiskyRecommendationSystem(
             data_path=DATA_PATH, openai_api_key=api_key, persist_directory=PERSIST_DIR
         )
@@ -79,6 +115,8 @@ def health_check():
             {
                 "status": "healthy",
                 "message": "Bob AI Whisky Recommendation System is running",
+                "embeddings_path": PERSIST_DIR,
+                "precomputed_embeddings_path": PRECOMPUTED_EMBEDDINGS,
             }
         ),
         200,
@@ -258,6 +296,38 @@ def get_recommendation_by_username(username):
     except Exception as e:
         logger.error(f"Error generating recommendations for user {username}: {e}")
         return jsonify({"error": f"Failed to generate recommendations: {str(e)}"}), 500
+
+
+# Add an endpoint to check embeddings status
+@app.route("/embeddings/status", methods=["GET"])
+def embeddings_status():
+    """Check if embeddings are properly loaded."""
+    try:
+        if (
+            hasattr(recommendation_system, "vector_store")
+            and recommendation_system.vector_store is not None
+        ):
+            count = recommendation_system.vector_store._collection.count()
+            return (
+                jsonify(
+                    {
+                        "status": "loaded",
+                        "embeddings_count": count,
+                        "persist_dir": PERSIST_DIR,
+                        "precomputed_dir": PRECOMPUTED_EMBEDDINGS,
+                    }
+                ),
+                200,
+            )
+        else:
+            return (
+                jsonify(
+                    {"status": "not_loaded", "error": "Vector store not initialized"}
+                ),
+                500,
+            )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 if __name__ == "__main__":

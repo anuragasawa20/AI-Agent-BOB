@@ -15,7 +15,7 @@ RUN pip install gunicorn
 # Copy the rest of the application
 COPY . .
 
-# Create directory for persistent embeddings
+# Create directory for embeddings (will be populated from pre-computed if available)
 RUN mkdir -p /app/whisky_embeddings
 
 # Set environment variables
@@ -23,9 +23,10 @@ ENV PYTHONPATH=/app
 ENV PORT=8080
 ENV PERSIST_DIR=/app/whisky_embeddings
 ENV DATA_PATH=/app/501\ Bottle\ Dataset.csv
+ENV PYTHONUNBUFFERED=1
 
 # Expose the port
 EXPOSE ${PORT}
 
 # Run the application with gunicorn
-CMD gunicorn --bind 0.0.0.0:${PORT} deployment:app 
+CMD gunicorn --bind 0.0.0.0:${PORT} --timeout 120 deployment:app 
