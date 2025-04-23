@@ -544,6 +544,11 @@ class WhiskyRecommendationSystem:
         """
         Prioritize recommendations based on user's spirit type preferences while ensuring diversity.
 
+        This function ensures:
+        1. Maximum representation: A spirit type appears in recommendations at most according to its collection percentage
+        2. Diversity: Never recommend only a single spirit type
+        3. Empty collection handling: When no collection exists, show diverse recommendations based on popularity
+
         Args:
             candidates: List of filtered candidate Document objects.
             user_preferences: User preferences extracted from collection.
@@ -560,6 +565,15 @@ class WhiskyRecommendationSystem:
         # Get list of spirit types in the user's collection
         collection_spirit_types = list(type_frequency.keys())
 
+        # Define max recommendations to return
+        max_recommendations = min(len(candidates), 5)  # Default to 5
+
+        # Special case: Empty collection or very limited collection (1-2 items)
+        if not collection_spirit_types or len(collection_spirit_types) < 2:
+            return self._handle_empty_collection_recommendations(
+                candidates, max_recommendations
+            )
+
         # Define a scoring function for each candidate
         def score_candidate(doc):
             spirit_type = doc.metadata.get("spirit_type", "")
@@ -567,13 +581,6 @@ class WhiskyRecommendationSystem:
             # Base score is the frequency of this type in the user's collection
             # (default to 0 if type not in collection)
             type_score = type_frequency.get(spirit_type, 0)
-
-            # If the spirit type is in the user's collection but not the most common type,
-            # give it a boost to ensure diversity
-            if spirit_type in collection_spirit_types and type_score < max(
-                type_frequency.values()
-            ):
-                type_score += 0.2  # Diversity boost
 
             # Boost score based on whisky rating/popularity
             ranking = float(
@@ -590,31 +597,137 @@ class WhiskyRecommendationSystem:
         scored_candidates = [(score_candidate(doc), doc) for doc in candidates]
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
 
-        # Now ensure diversity in the final selection
-        prioritized = []
-        represented_types = set()
+        # Determine maximum allocation per type based on collection percentages
+        # and ensure no single type dominates
+        type_allocations = {}
+
+        # Calculate initial allocations based on frequencies (cap at their % representation)
+        for spirit_type, freq in type_frequency.items():
+            # Calculate the maximum number based on frequency (rounded up)
+            max_of_type = min(
+                max(1, round(freq * max_recommendations)),
+                max_recommendations - 1,  # Ensure at least one slot for diversity
+            )
+            type_allocations[spirit_type] = max_of_type
+
+        # Ensure we reserve at least one slot for a type not in the collection for diversity
+        total_allocation = sum(type_allocations.values())
+        if total_allocation >= max_recommendations:
+            # Reduce allocations proportionally, starting with the most frequent types
+            sorted_types = sorted(
+                type_frequency.items(), key=lambda x: x[1], reverse=True
+            )
+            for spirit_type, _ in sorted_types:
+                if total_allocation < max_recommendations:
+                    break
+                if type_allocations[spirit_type] > 1:  # Don't reduce to zero
+                    type_allocations[spirit_type] -= 1
+                    total_allocation -= 1
+
+        # Allocate recommendations based on calculated distribution
+        result = []
+        type_counts = {t: 0 for t in type_allocations}
         remaining = []
 
-        # First pass: take top candidates of each type in collection
+        # First pass: Add recommendations within allocation limits
         for score, doc in scored_candidates:
             spirit_type = doc.metadata.get("spirit_type", "")
-            if (
-                spirit_type in collection_spirit_types
-                and spirit_type not in represented_types
-            ):
-                prioritized.append(doc)
-                represented_types.add(spirit_type)
-                # If we've selected at least one of each type in collection, move on
-                if len(represented_types) >= len(collection_spirit_types):
-                    break
 
-        # Second pass: add remaining candidates by score
-        for score, doc in scored_candidates:
-            if doc not in prioritized:
+            if spirit_type in type_allocations and type_counts.get(
+                spirit_type, 0
+            ) < type_allocations.get(spirit_type, 0):
+                result.append(doc)
+                type_counts[spirit_type] = type_counts.get(spirit_type, 0) + 1
+            else:
                 remaining.append(doc)
 
-        # Combine priorities with remaining, ensuring we start with at least one of each type
-        return prioritized + remaining
+            # Break if we have enough recommendations
+            if len(result) >= max_recommendations:
+                break
+
+        # If we still have slots to fill, prioritize diversity
+        remaining_slots = max_recommendations - len(result)
+        if remaining_slots > 0:
+            # Get all unique spirit types in remaining candidates
+            remaining_types = set(
+                doc.metadata.get("spirit_type", "") for _, doc in remaining
+            )
+
+            # Prioritize types not yet in the results
+            represented_types = set(
+                doc.metadata.get("spirit_type", "") for doc in result
+            )
+            diversity_candidates = [
+                doc
+                for _, doc in remaining
+                if doc.metadata.get("spirit_type", "") not in represented_types
+            ]
+
+            # Add diverse recommendations first
+            for doc in diversity_candidates:
+                if remaining_slots <= 0:
+                    break
+                result.append(doc)
+                remaining_slots -= 1
+                represented_types.add(doc.metadata.get("spirit_type", ""))
+
+            # Fill any remaining slots with highest scored remaining candidates
+            if remaining_slots > 0:
+                for _, doc in scored_candidates:
+                    if doc not in result and remaining_slots > 0:
+                        result.append(doc)
+                        remaining_slots -= 1
+                    if remaining_slots <= 0:
+                        break
+
+        return result
+
+    def _handle_empty_collection_recommendations(
+        self, candidates: List[Document], max_recommendations: int
+    ) -> List[Document]:
+        """
+        Handle the case where user has no collection or very limited collection.
+        Return diverse recommendations based on popularity and ensuring multiple spirit types.
+
+        Args:
+            candidates: List of candidate Document objects
+            max_recommendations: Maximum number of recommendations to return
+
+        Returns:
+            List of diverse Document objects
+        """
+        # Group candidates by spirit type
+        spirit_type_groups = {}
+        for doc in candidates:
+            spirit_type = doc.metadata.get("spirit_type", "")
+            if spirit_type not in spirit_type_groups:
+                spirit_type_groups[spirit_type] = []
+            spirit_type_groups[spirit_type].append(doc)
+
+        # Sort each group by popularity/ranking
+        for spirit_type, docs in spirit_type_groups.items():
+            docs.sort(key=lambda doc: float(doc.metadata.get("ranking", 500)))
+
+        # Take top from each spirit type in rotation
+        result = []
+        spirit_types = list(spirit_type_groups.keys())
+
+        if not spirit_types:
+            return []
+
+        # Ensure we have at least one from each available spirit type
+        index = 0
+        while len(result) < max_recommendations and len(result) < len(candidates):
+            spirit_type = spirit_types[index % len(spirit_types)]
+            if spirit_type_groups[spirit_type]:
+                result.append(spirit_type_groups[spirit_type].pop(0))
+            index += 1
+
+            # Break if we've gone through all available candidates
+            if all(len(group) == 0 for group in spirit_type_groups.values()):
+                break
+
+        return result
 
     def get_recommendations(
         self,

@@ -191,7 +191,7 @@ def get_recommendation_by_username(username):
         request_obj = WhiskyRecommendationSystem.RecommendationRequest(
             collection=[],  # Collection will be fetched from API using username
             username=username,
-            max_recommendations=5,
+            max_recommendations=10,
         )
 
         # Get recommendations
@@ -200,7 +200,7 @@ def get_recommendation_by_username(username):
 
         # Format response
         result = {
-            "user_profile": response.user_profile,
+            # "user_profile": response.user_profile,
             "recommendations": [
                 {
                     "id": rec.id,
