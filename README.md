@@ -93,7 +93,49 @@ The server will run on http://localhost:5000 by default.
    GET /health
    ```
 
-2. **Get Recommendations**:
+2. **Get Recommendations By Username**:
+   ```
+   POST /get/recommendation/<username>
+   ```
+   Response:
+
+   ```json 
+   {
+      "recommendations": [
+    {
+      "id": "21319",
+      "interesting_fact": "Traveller Whiskey pays homage to the tradition of American pioneers who carried whiskey with them as they traveled across the country, making it a spirit that embodies the adventurous spirit of the early American frontier.",
+      "name": "Traveller Whiskey",
+      "price": 39.97,
+      "reasoning": "The Traveller Whiskey is a bourbon that matches the user's preference for mid-range priced spirits and aligns with their average ABV preference for bourbons. Given the user's substantial collection of bourbons and preference for high-proof spirits, this bourbon, with an ABV of 45%, fits comfortably within their profile while remaining budget-friendly.",
+      "similarity_score": 0.8,
+      "spirit_type": "Bourbon"
+    },
+    {
+      "id": "466",
+      "interesting_fact": "Buffalo Trace Distillery is one of the oldest distilling sites in the United States, with a rich history dating back to the late 1700s. The distillery has been known by different names over the centuries, but it has continuously operated, even during Prohibition when it was allowed to produce whiskey for 'medicinal purposes'.",
+      "name": "Buffalo Trace",
+      "price": 26.99,
+      "reasoning": "Buffalo Trace is a classic bourbon that falls well within the user's price range preference and hits their bourbon ABV sweet spot. It is a highly regarded bourbon with a more accessible price, which may appeal to the user's evident appreciation for bourbons with a robust character and heritage.",
+      "similarity_score": 0.9,
+      "spirit_type": "Bourbon"
+    },
+    {
+      "id": "620",
+      "interesting_fact": "The Buffalo Trace distillery has won numerous awards for its products and has been named 'Distillery of the Year' by Whisky Advocate multiple times, showcasing its commitment to quality and excellence in bourbon production.",
+      "name": "Buffalo Trace",
+      "price": 49.54,
+      "reasoning": "This offering of Buffalo Trace bourbon is slightly more expensive than the previous one but still within the user's price range preference for bourbon. The ABV is consistent with what the user seems to enjoy, and the ranking and wishlist count suggest it is well-regarded, which may appeal to the user's interest in popular and reputable bourbons.",
+      "similarity_score": 0.85,
+      "spirit_type": "Bourbon"
+    }
+    ]
+   }
+
+
+
+
+3. **Get Recommendations By giving collection**:
    ```
    POST /api/recommendations
    ```
@@ -114,7 +156,7 @@ The server will run on http://localhost:5000 by default.
    }
    ```
 
-3. **Analyze Collection**:
+4. **Analyze Collection**:
    ```
    POST /api/analyze
    ```
