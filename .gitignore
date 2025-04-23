@@ -1,0 +1,11 @@
+.cursorindexingignore
+.cursorignore
+.cursorignore.md
+.cursorignore.txt
+.cursorignore.json
+.cursorignore.yaml
+.cursorignore.yml
+.specstory
+.env
+sample-user-wishlist.json
+__pycache__
