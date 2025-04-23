@@ -22,6 +22,7 @@ Bob AI connects to the Baxus service to analyze your existing whisky collection 
 - **POST /api/recommendations**: Get recommendations by providing your collection
 - **POST /api/analyze**: Analyze your collection to understand your preference profile
 
+The Live API Link: https://bob-ai-agent-ejb2w.ondigitalocean.app/ai-agent-bob2/get/recommendation/${username}
 
 ## Architecture
 
