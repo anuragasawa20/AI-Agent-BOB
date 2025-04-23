@@ -1,8 +1,11 @@
 import os
 from flask import Flask, request, jsonify
-from bob_ai.main import WhiskyRecommendationSystem, BaxusAPI, load_collection_from_file
+from bob_ai.main import (
+    WhiskyRecommendationSystem,
+    BaxusAPI,
+    load_collection_from_file,
+)
 import logging
-import gunicorn
 from pathlib import Path
 import shutil
 
@@ -203,7 +206,7 @@ def get_recommendations():
 
     except Exception as e:
         logger.error(f"Error generating recommendations: {e}")
-        return jsonify({"error": f"Failed to generate recommendations: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/analyze", methods=["POST"])
