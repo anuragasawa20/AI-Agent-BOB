@@ -4,7 +4,7 @@ Bob is an AI agent built to analyze users' virtual collections and provide perso
 
 ## Overview
 
-Bob AI connects to the Baxus service to analyze your existing whisky collection and provides personalized recommendations tailored to your taste profile. The system uses advanced natural language processing and semantic similarity to understand the nuances of flavor profiles and match them to your preferences.
+Bob AI connects to the Baxus service to analyze your existing Food collection and provides personalized recommendations tailored to your taste profile. The system uses advanced natural language processing and semantic similarity to understand the nuances of flavor profiles and match them to your preferences.
 
 ## Key Features
 
